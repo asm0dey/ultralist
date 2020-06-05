@@ -30,20 +30,39 @@ func (w *Webapp) handleFavicon(writer http.ResponseWriter, r *http.Request) {
 }
 
 func (w *Webapp) handleAuthResponse(writer http.ResponseWriter, r *http.Request) {
-	keys, ok := r.URL.Query()["token"]
+	cliTokens, ok := r.URL.Query()["cli_token"]
 	if ok == false {
-		fmt.Println("Something went wrong... I did not get a token back.")
+		fmt.Println("Something went wrong... I did not get a CLI token back.")
 		os.Exit(0)
 	}
 
 	backend := NewBackend()
-	backend.WriteCreds(keys[0])
+	backend.WriteCreds(cliTokens[0])
 	fmt.Println("Authorization successful!")
-	fmt.Fprintf(writer, "Authorization complete. Head back to your terminal for next steps.")
+
+	webTokens, ok := r.URL.Query()["web_token"]
+	if ok == false {
+		fmt.Println("Something went wrong... I did not get a web token back.")
+		os.Exit(0)
+	}
+
+	signup, _ := r.URL.Query()["signup"]
+
+	http.Redirect(writer, r, w.frontendUrl(webTokens[0], signup[0]), http.StatusSeeOther)
 
 	// sleep 1 second before shutting server down, so we can display msg on web.
 	go func() {
 		time.Sleep(1 * time.Second)
 		w.server.Shutdown(nil)
 	}()
+}
+
+func (w *Webapp) frontendUrl(token string, signup string) string {
+	envFrontendURL := os.Getenv("ULTRALIST_FRONTEND_URL")
+
+	if envFrontendURL != "" {
+		return envFrontendURL + "/auth?cli_auth=true&signup=" + signup + "&token=" + token
+	}
+
+	return "https://app.ultralist.io/auth?cli_auth=true&token=" + token
 }
